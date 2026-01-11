@@ -10,6 +10,10 @@ struct Tensor4D {
     Tensor4D(unsigned int const shape_[4], T const *data_) {
         unsigned int size = 1;
         // TODO: 填入正确的 shape 并计算 size
+        for (int i = 0; i < 4; ++i) {
+            shape[i] = shape_[i];
+            size *= shape[i];
+        }
         data = new T[size];
         std::memcpy(data, data_, size * sizeof(T));
     }
@@ -28,6 +32,38 @@ struct Tensor4D {
     // 则 `this` 与 `others` 相加时，3 个形状为 `[1, 2, 1, 4]` 的子张量各自与 `others` 对应项相加。
     Tensor4D &operator+=(Tensor4D const &others) {
         // TODO: 实现单向广播的加法
+        // `单向`指的应该是others的shape只能是1或者和this的一样
+        // 检查形状是否符合要求
+        for (size_t i = 0; i < 4; ++i) {
+            ASSERT(1 == others.shape[i] || others.shape[i] == shape[i], "wrong shape in others");
+        }
+        // 提前计算一些stride
+        unsigned int strides[4];
+        unsigned int ostrides[4];
+        strides[3] = 1u;
+        ostrides[3] = 1u;
+        for (int i = 2; i >= 0; --i) {
+            strides[i] = strides[i + 1] * shape[i + 1];
+            ostrides[i] = ostrides[i + 1] * others.shape[i + 1];
+        }
+        for (unsigned int i0 = 0; i0 < shape[0]; ++i0) {
+            const unsigned int base0 = i0 * strides[0];
+            const unsigned int obase0 = (1 == others.shape[0] ? 0u : (i0 * ostrides[0]));
+            for (unsigned int i1 = 0; i1 < shape[1]; ++i1) {
+                const unsigned int base1 = base0 + i1 * strides[1];
+                const unsigned int obase1 = obase0 + (1 == others.shape[1] ? 0u : i1 * ostrides[1]);
+                for (unsigned int i2 = 0; i2 < shape[2]; ++i2) {
+                    const unsigned int base2 = base1 + i2 * strides[2];
+                    const unsigned int obase2 = obase1 + (1 == others.shape[2] ? 0u : i2 * ostrides[2]);
+                    for (unsigned int i3 = 0; i3 < shape[3]; ++i3) {
+                        const unsigned int idx = base2 + i3;
+                        const unsigned int oidx = obase2 + (1 == others.shape[3] ? 0u : i3);
+                        data[idx] +=
+                            others.data[oidx];
+                    }
+                }
+            }
+        }
         return *this;
     }
 };
